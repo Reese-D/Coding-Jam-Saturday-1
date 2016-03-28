@@ -17,6 +17,10 @@
 //TODO bring global variables into struct so that they can be passed through
 //functions, allowing multiple instances to exist at once
 
+
+
+
+
 //------------------------------------------------------------------------------
 // structure that will define our chromosome for genetic algorithms
 //------------------------------------------------------------------------------
@@ -37,6 +41,11 @@ typedef struct indexOffset{
   int B;
   int B_Index;
 }indexOffset;
+
+
+
+
+
 //------------------------------------------------------------------------------
 // declare function prototypes
 //------------------------------------------------------------------------------
@@ -52,6 +61,12 @@ static void sigHandler(int signal, siginfo_t *info, void *context){
   if(signal == SIGSEGV || signal == SIGILL || signal == SIGUSR1) longjmp(currentJump, 1);
 }
 static struct sigaction sa;
+
+
+
+
+
+
 
 /*******************************************************************************
 * takes the number of bits for a chromosome and the number of chromosomes total
@@ -76,6 +91,8 @@ chromosomeList createChromosomeList(int chromoLength, int totalOrganisms){
 }
 
 
+
+
 /*******************************************************************************
 * finds a specific position in an unsigned long
 *******************************************************************************/
@@ -89,6 +106,8 @@ static void findChromoOffsets(int index, indexOffset *returnVal){
   returnVal->B_Index = B_Index;
   returnVal->B = B;
 }
+
+
 
 
 /*******************************************************************************
@@ -112,6 +131,8 @@ unsigned long* getBits(int index, chromosome *c, int numBits, unsigned long* ret
   }
   signal(SIGSEGV, SIG_DFL);
 }
+
+
 
 
 /*******************************************************************************
@@ -141,6 +162,8 @@ void mutate(chromosomeList *c, int numChromos){
 }
 
 
+
+
 /*******************************************************************************
 * flips a specified bit in a chromosome
 *******************************************************************************/
@@ -158,18 +181,30 @@ static int flipBit(chromosome *c, int index){
   return 1;
 }
 
+
+
+
+/*******************************************************************************
+* Prints out chromosomes for testing and visualization
+*******************************************************************************/
 void printAllChromosomes(chromosomeList *c){
   for(int x = 0; x < c->numChromos){
     for(int y = 0; y < chromoLength; y++){
-      
+      //TODO finish this up
     }
   }
 }
 
 
 
+
+
+
+
+
+
 /*******************************************************************************
-* Main function for testing, requires preproccessor declaration in compilation
+* functions for testing, requires preproccessor declaration in compilation
 *******************************************************************************/
 #ifdef UNIT_TEST
   void test_flipBit(chromosomeList *c){
