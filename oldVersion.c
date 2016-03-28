@@ -27,8 +27,8 @@ typedef struct chromosome{
 
 typedef struct chromosomeList{
   chromosome *myChromosomes;
-  int chromoLength; //the number of longs per chromosome
-  int numChromos; //the number of chromosomes
+  int chromoLength;
+  int numChromos;
   int pid;
 
 }chromosomeList;
@@ -40,18 +40,18 @@ typedef struct indexOffset{
 //------------------------------------------------------------------------------
 // declare function prototypes
 //------------------------------------------------------------------------------
-static int flipBit(chromosome *c, int index);
+static void flipBit(chromosome *c, int index);
 chromosomeList createChromosomeList(int chromoLength, int totalOrganisms);
 static void findChromoOffsets(int index, indexOffset *returnVal);
-unsigned long* getBits(int index, chromosome *c, int numBits, unsigned long* returnVal);
-void mutate(chromosomeList *c, int numChromos);
+unsigned long getBits(int index, chromosome *c, int numBits);
+void mutate(chromosome *c, int numChromos, indexOffset inOff);
 
 
 static sigjmp_buf currentJump;
 static void sigHandler(int signal, siginfo_t *info, void *context){
   if(signal == SIGSEGV || signal == SIGILL || signal == SIGUSR1) longjmp(currentJump, 1);
 }
-static struct sigaction sa;
+
 
 /*******************************************************************************
 * takes the number of bits for a chromosome and the number of chromosomes total
@@ -61,17 +61,20 @@ chromosomeList createChromosomeList(int chromoLength, int totalOrganisms){
   chromosomeList myChromosomeList;
   //allocate memory for each organism
   myChromosomeList.myChromosomes = malloc(sizeof(chromosome) * totalOrganisms);
-  myChromosomeList.numChromos = totalOrganisms;
+  myChromosomeList.chromoLength = chromoLength;
   //figure out how many 'longs' needed per chromosome
-  myChromosomeList.chromoLength = chromoLength/(sizeof(unsigned long)*8) + 1;
+  myChromosomeList.numChromos = chromoLength/(sizeof(unsigned long)*8) + 1;
 
   //allocate space for each organisms chromosome
   for(int x = 0; x < totalOrganisms; x++){
-    myChromosomeList.myChromosomes[x].bits = malloc(sizeof(unsigned long) * chromoLength);
+    myChromosomeList.myChromosomes[x].bits = malloc(sizeof(unsigned long) * myChromosomeList.numChromos);
   }
-
-  sa.sa_sigaction = &sigHandler;/* The SA_SIGINFO flag tells sigaction() to use the sa_sigaction field, not sa_handler. */
-  sa.sa_flags = SA_RESTART | SA_SIGINFO | SA_NODEFER;
+  struct sigaction sa;
+  myChromosomeList.sa.sa_sigaction = &sigHandler;/* The SA_SIGINFO flag tells sigaction() to use the sa_sigaction field, not sa_handler. */
+  myChromosomeList.sa.sa_flags = SA_RESTART | SA_SIGINFO | SA_NODEFER;
+  sigaction(SIGSEGV, &myChromosomeList.sa, NULL); /*assign SIGSEGV to be handled by our sigHandler*/
+  sigaction(SIGILL, &myChromosomeList.sa, NULL);
+  sigaction(SIGUSR1, &myChromosomeList.sa, NULL);
   return myChromosomeList;
 }
 
@@ -97,72 +100,48 @@ static void findChromoOffsets(int index, indexOffset *returnVal){
 *
 * returns -1 if index is out of bounds
 *******************************************************************************/
-unsigned long* getBits(int index, chromosome *c, int numBits, unsigned long* returnVal){
-  sigaction(SIGSEGV, &sa, NULL); /*assign SIGSEGV to be handled by our sigHandler*/
+unsigned long getBits(int index, chromosome *c, int numBits){
   if(!setjmp(currentJump)){
     indexOffset *inOff = malloc(sizeof(indexOffset*));
     findChromoOffsets(index, inOff);
-    if(inOff == NULL) return NULL;
+    if(inOff == NULL) raise(SIGUSR1);
     unsigned long temp = c->bits[inOff->B_Index] >> inOff->B;
     unsigned long compare = pow(2, numBits) -1;
-    *returnVal =  (temp & compare);//doesn't shift bits back to position
-    return returnVal;
+    return (temp & compare);//doesn't shift bits back to position
   }else{
-    return NULL;
+    fprintf(stderr, "index out of bounds or num bits invalid\n");
+    exit(1);
   }
-  signal(SIGSEGV, SIG_DFL);
+
 }
 
 
 /*******************************************************************************
 * attempts to mutate a chromosome's bits based on some small chance
 *******************************************************************************/
-void mutate(chromosomeList *c, int numChromos){
-  for(int x = 0; x < numChromos; x++){
-    int mutType1 = rand() % MUTATION_RATE;
-    int mutType2 = rand() % MUTATION_RATE;
-    int temp = rand() % c->chromoLength;
-    if(mutType1 == mutType2){
-      int rightLeft = rand() % 2; //50 50 chance of left or right shift
-      c->myChromosomes[x].bits[temp] = rightLeft ? c->myChromosomes[x].bits[temp] >> 1 : c->myChromosomes[x].bits[temp] << 1;
-    }else if(mutType1 == mutType2 /2){
-      c->myChromosomes[x].bits[temp] *= 2;
-    }else{
-      int totalBits = c->chromoLength * (sizeof(unsigned long)*8); //number of longs aka chromolength times numbits in each
-      int mutRate = totalBits * MUTATION_RATE;
-      for(int y = 0; y < totalBits; y++){
-        int randNum = rand() % mutRate;
-        if(randNum <= totalBits){ //1 in 1000 chance to occur each time around
-          flipBit(&c->myChromosomes[randNum / sizeof(unsigned long) * 8], randNum % sizeof(unsigned long) * 8);
-        }
-      }
-    }
+void mutate(chromosome *c, int numChromos, indexOffset inOff){
+  float multiplier = (numChromos * sizeof(unsigned long) * 8) / (float) MUTATION_RATE + 1;
+  for(int x = 0; x < multiplier; x++){
+    int value = rand() % MUTATION_RATE; //get a random value between 0 - 999
+    value *= x;
+    flipBit(c, value);
+
+    //TODO do this a better way
   }
+
 }
 
 
 /*******************************************************************************
 * flips a specified bit in a chromosome
 *******************************************************************************/
-static int flipBit(chromosome *c, int index){
-  if(index < 0 || c == NULL) return -1;
-  sigaction(SIGSEGV, &sa, NULL); /*assign SIGSEGV to be handled by our sigHandler*/
+static void flipBit(chromosome *c, int index){
   if(!setjmp(currentJump)){
     indexOffset *inOff = malloc(sizeof(indexOffset*));
-    findChromoOffsets(index, inOff);
+    findChromoOffsets(index, inOff); //TODO findChromoOffsets was edited change this
     c->bits[inOff->B_Index] = c->bits[inOff->B_Index] ^ (1 << inOff->B);
   }else{
-    return -1;
-  }
-  signal(SIGSEGV, SIG_DFL);
-  return 1;
-}
-
-void printAllChromosomes(chromosomeList *c){
-  for(int x = 0; x < c->numChromos){
-    for(int y = 0; y < chromoLength; y++){
-      
-    }
+    fprintf(stderr, "index out of bounds in flip bit call\n");
   }
 }
 
@@ -174,36 +153,54 @@ void printAllChromosomes(chromosomeList *c){
 #ifdef UNIT_TEST
   void test_flipBit(chromosomeList *c){
     c->myChromosomes[0].bits[1] = 1111;
-    unsigned long *temp = malloc(sizeof(temp));
+    long temp;
     flipBit(&c->myChromosomes[0], 67);
-    if((*temp = *getBits(66, &c->myChromosomes[0],5,temp)) != 23){
-      fprintf(stderr, "getBits should have returned 23, instead returned: %lu\n",*temp);
+    if((temp = getBits(66, &c->myChromosomes[0],5)) != 23){
+      fprintf(stderr, "getBits should have returned 23, instead returned: %lu\n",temp);
     }
     c->myChromosomes[55].bits[0] = 204;
     flipBit(&c->myChromosomes[55], 50);
-    if((*temp = *getBits(0, &c->myChromosomes[55],2,temp)) != 0){
-      fprintf(stderr, "getBits should have returned 0, instead returned: %lu\n",*temp);
+    if((temp = getBits(0, &c->myChromosomes[55],2)) != 0){
+      fprintf(stderr, "getBits should have returned 0, instead returned: %lu\n",temp);
     }
     flipBit(&c->myChromosomes[55], 2);
-    if((*temp = *getBits(0, &c->myChromosomes[55],3,temp)) != 0){
-      fprintf(stderr, "getBits should have returned 0, instead returned: %lu\n",*temp);
+    if((temp = getBits(0, &c->myChromosomes[55],3)) != 0){
+      fprintf(stderr, "getBits should have returned 0, instead returned: %lu\n",temp);
     }
     flipBit(&c->myChromosomes[55], 3);
-    if((*temp = *getBits(3, &c->myChromosomes[55],4,temp)) != 8){
-      fprintf(stderr, "getBits should have returned 8, instead returned: %lu\n",*temp);
+    if((temp = getBits(3, &c->myChromosomes[55],4)) != 8){
+      fprintf(stderr, "getBits should have returned 8, instead returned: %lu\n",temp);
     }
 
-    if(flipBit(&c->myChromosomes[105], 3) != -1){
-      printf("flip bit didn't catch an out of bounds call\n");
+    //try to cause some out of bounds errors
+    int fd[2];
+    char *str = malloc(sizeof(char) * 100);
+    if (pipe (fd) < 0) { //open a pipe
+      perror ("plumbing problem");
+      exit(1);
     }
-    if(flipBit(&c->myChromosomes[55], -1) != -1){
-      printf("flip bit didn't catch a negative index value\n");
-    }
+    dup2(fd[1],STDERR_FILENO);
+    close(fd[1]);
+    fcntl(fd[0], F_SETFL, O_NONBLOCK); //don't let our readers hang
 
-    if(flipBit(&c->myChromosomes[-1], 3) != -1){
-      printf("flip bit didn't catch an out of bounds call in the negative direction\n");
-    }
+    flipBit(&c->myChromosomes[105], 3);
+    read(fd[0], str, sizeof(char) *100);
+    if(strcmp(str, "index out of bounds in flip bit call\n")){
+      printf("expected string to say: index out of bounds in flip bit call\treceived:%s\n", str);
+    };
 
+    str = "failed to recognize negative index";
+    flipBit(&c->myChromosomes[55], -1);
+    read(fd[0], str, sizeof(char) *100);
+    if(strcmp(str, "index out of bounds in flip bit call\n")){
+      printf("expected string to say: index out of bounds in flip bit call\treceived:%s\n", str);
+    };
+
+    // flipBit(&c->myChromosomes[-1], 3);
+    // read(fd[0], &str, sizeof(char) *100);
+    // if(strcmp(str, "index out of bounds in flip bit call\n")){
+    //   printf("expected string to say: index out of bounds in flip bit call\treceived:%s\n", str);
+    // };
 
   }
 
@@ -213,19 +210,19 @@ void printAllChromosomes(chromosomeList *c){
 
   void test_getBits(chromosomeList *c){
     c->myChromosomes[0].bits[1] = 1111;
-    unsigned long *temp = malloc(sizeof(unsigned long*));
-    if((*temp = *getBits(66, &c->myChromosomes[0],5,temp)) != 21){
-      fprintf(stderr, "getBits should have returned 21, instead returned: %lu\n",*temp);
+    long temp;
+    if((temp = getBits(66, &c->myChromosomes[0],5)) != 21){
+      fprintf(stderr, "getBits should have returned 21, instead returned: %lu\n",temp);
     }
     c->myChromosomes[55].bits[0] = 204;
-    if((*temp = *getBits(0, &c->myChromosomes[55],2,temp)) != 0){
-      fprintf(stderr, "getBits should have returned 0, instead returned: %lu\n",*temp);
+    if((temp = getBits(0, &c->myChromosomes[55],2)) != 0){
+      fprintf(stderr, "getBits should have returned 0, instead returned: %lu\n",temp);
     }
-    if((*temp = *getBits(0, &c->myChromosomes[55],3,temp)) != 4){
-      fprintf(stderr, "getBits should have returned 4, instead returned: %lu\n",*temp);
+    if((temp = getBits(0, &c->myChromosomes[55],3)) != 4){
+      fprintf(stderr, "getBits should have returned 4, instead returned: %lu\n",temp);
     }
-    if((*temp = *getBits(3, &c->myChromosomes[55],4,temp)) != 9){
-      fprintf(stderr, "getBits should have returned 9, instead returned: %lu\n",*temp);
+    if((temp = getBits(3, &c->myChromosomes[55],4)) != 9){
+      fprintf(stderr, "getBits should have returned 9, instead returned: %lu\n",temp);
     }
   }
 
@@ -238,6 +235,10 @@ void printAllChromosomes(chromosomeList *c){
     myChromoList.myChromosomes[0].bits[1] = 1111;
     test_getBits(&myChromoList);
     test_flipBit(&myChromoList);
+    printf("%lu\n",getBits(66, &myChromoList.myChromosomes[0], 5));
+    // printf("B_Index: %i\t B: %i\n",B_Index, B);
+    //mutate(&myChromosomes[0]);
+    //TODO change most of this it won't work
   }
 
 

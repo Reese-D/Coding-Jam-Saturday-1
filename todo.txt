@@ -2,3 +2,4 @@
 2) create some general test for between unit functions
 3) clean up code and finish TODO's
 4) add logic / continue forward
+5) make each initialize call fork and return a pipe, then communicate to process through pipes so it can process autonomously
