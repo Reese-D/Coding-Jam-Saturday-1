@@ -4,6 +4,8 @@
 #include <time.h>
 #include <signal.h>
 #include <setjmp.h>
+#include <unistd.h>
+#include <string.h>
 
 #define CROSSOVER_RATE            0.7
 #define MUTATION_RATE             1000    //1 in 1000
@@ -159,6 +161,20 @@ static void flipBit(chromosome *c, int index){
     if((temp = getBits(3, &c->myChromosomes[55],4)) != 8){
       fprintf(stderr, "getBits should have returned 8, instead returned: %lu\n",temp);
     }
+
+    //try to cause some out of bounds errors
+    int fd[2];
+    char str[100];
+    if (pipe (fd) < 0) { //open a pipe
+      perror ("plumbing problem");
+      exit(1);
+    }
+    dup2(fd[1],STDERR_FILENO);
+    flipBit(&c->myChromosomes[105], 3);
+    read(fd[0], &str, sizeof(char) *100);
+    if(strcmp(str, "index out of bounds in flip bit call\n")){
+      printf("expected string to say: index out of bounds in flip bit call\treceived:%s\n", str);
+    };
   }
 
   void test_findChromoOffsets(chromosomeList *c){
