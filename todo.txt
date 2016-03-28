@@ -1,0 +1,4 @@
+1) Finish up the rest of the unit tests
+2) create some general test for between unit functions
+3) clean up code and finish TODO's
+4) add logic / continue forward
