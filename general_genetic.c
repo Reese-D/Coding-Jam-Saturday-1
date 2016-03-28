@@ -153,7 +153,16 @@ static void flipBit(chromosome *c, indexOffset inOff, int index){
     if((temp = getBits(66, &c->myChromosomes[0],5)) != 21){
       fprintf(stderr, "getBits should have returned 21, instead returned: %lu\n",temp);
     }
-
+    c->myChromosomes[55].bits[0] = 204;
+    if((temp = getBits(0, &c->myChromosomes[55],2)) != 0){
+      fprintf(stderr, "getBits should have returned 0, instead returned: %lu\n",temp);
+    }
+    if((temp = getBits(0, &c->myChromosomes[55],3)) != 4){
+      fprintf(stderr, "getBits should have returned 4, instead returned: %lu\n",temp);
+    }
+    if((temp = getBits(3, &c->myChromosomes[55],4)) != 9){
+      fprintf(stderr, "getBits should have returned 9, instead returned: %lu\n",temp);
+    }
   }
 
   void test_mutate(chromosomeList *c){
