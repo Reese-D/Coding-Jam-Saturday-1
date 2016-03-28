@@ -35,7 +35,7 @@ typedef struct indexOffset{
 //------------------------------------------------------------------------------
 // declare function prototypes
 //------------------------------------------------------------------------------
-static void flipBit(chromosome *c, indexOffset inOff, int index);
+static void flipBit(chromosome *c, int index);
 chromosomeList createChromosomeList(int chromoLength, int totalOrganisms);
 static indexOffset findChromoOffsets(int index);
 unsigned long getBits(int index, chromosome *c, int numBits);
@@ -113,7 +113,7 @@ void mutate(chromosome *c, int numChromos, indexOffset inOff){
   for(int x = 0; x < multiplier; x++){
     int value = rand() % MUTATION_RATE; //get a random value between 0 - 999
     value *= x;
-    flipBit(c, inOff, value);
+    flipBit(c, value);
 
     //TODO do this a better way
   }
@@ -124,9 +124,9 @@ void mutate(chromosome *c, int numChromos, indexOffset inOff){
 /*******************************************************************************
 * flips a specified bit in a chromosome
 *******************************************************************************/
-static void flipBit(chromosome *c, indexOffset inOff, int index){
+static void flipBit(chromosome *c, int index){
   if(!setjmp(currentJump)){
-    findChromoOffsets(index); //TODO findChromoOffsets was edited change this
+    indexOffset inOff = findChromoOffsets(index); //TODO findChromoOffsets was edited change this
     c->bits[inOff.B_Index] = c->bits[inOff.B_Index] ^ (1 << inOff.B);
   }else{
     fprintf(stderr, "index out of bounds in flip bit call\n");
@@ -140,7 +140,25 @@ static void flipBit(chromosome *c, indexOffset inOff, int index){
 *******************************************************************************/
 #ifdef UNIT_TEST
   void test_flipBit(chromosomeList *c){
-
+    c->myChromosomes[0].bits[1] = 1111;
+    long temp;
+    flipBit(&c->myChromosomes[0], 67);
+    if((temp = getBits(66, &c->myChromosomes[0],5)) != 23){
+      fprintf(stderr, "getBits should have returned 23, instead returned: %lu\n",temp);
+    }
+    c->myChromosomes[55].bits[0] = 204;
+    flipBit(&c->myChromosomes[55], 50);
+    if((temp = getBits(0, &c->myChromosomes[55],2)) != 0){
+      fprintf(stderr, "getBits should have returned 0, instead returned: %lu\n",temp);
+    }
+    flipBit(&c->myChromosomes[55], 2);
+    if((temp = getBits(0, &c->myChromosomes[55],3)) != 0){
+      fprintf(stderr, "getBits should have returned 0, instead returned: %lu\n",temp);
+    }
+    flipBit(&c->myChromosomes[55], 3);
+    if((temp = getBits(3, &c->myChromosomes[55],4)) != 8){
+      fprintf(stderr, "getBits should have returned 8, instead returned: %lu\n",temp);
+    }
   }
 
   void test_findChromoOffsets(chromosomeList *c){
@@ -173,6 +191,7 @@ static void flipBit(chromosome *c, indexOffset inOff, int index){
     chromosomeList myChromoList = createChromosomeList(100, 100);
     myChromoList.myChromosomes[0].bits[1] = 1111;
     test_getBits(&myChromoList);
+    test_flipBit(&myChromoList);
     printf("%lu\n",getBits(66, &myChromoList.myChromosomes[0], 5));
     // printf("B_Index: %i\t B: %i\n",B_Index, B);
     //mutate(&myChromosomes[0]);
