@@ -188,10 +188,12 @@ static int flipBit(chromosome *c, int index){
 * Prints out chromosomes for testing and visualization
 *******************************************************************************/
 void printAllChromosomes(chromosomeList *c){
-  for(int x = 0; x < c->numChromos){
-    for(int y = 0; y < chromoLength; y++){
-      //TODO finish this up
+  for(int x = 0; x < c->numChromos; x++){
+    printf("Chromosome: %i\t", x);
+    for(int y = 0; y < c->chromoLength; y++){
+      printf("%lu\t", c->myChromosomes[x].bits[y]);
     }
+    printf("\n");
   }
 }
 
@@ -273,6 +275,13 @@ void printAllChromosomes(chromosomeList *c){
     myChromoList.myChromosomes[0].bits[1] = 1111;
     test_getBits(&myChromoList);
     test_flipBit(&myChromoList);
+    chromosomeList myChromoList2 = createChromosomeList(200, 5);
+    for(int x = 0; x < 5; x++){
+      for(int y = 0; y < 4; y++){
+          myChromoList2.myChromosomes[x].bits[y] = x*10 + y;
+      }
+    }
+    printAllChromosomes(&myChromoList2);
   }
 
 
