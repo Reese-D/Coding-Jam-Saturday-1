@@ -34,7 +34,6 @@ typedef struct chromosomeList{
   int chromoLength; //the number of longs per chromosome
   int numChromos; //the number of chromosomes
   int pid;
-
 }chromosomeList;
 
 typedef struct indexOffset{
@@ -72,6 +71,9 @@ static struct sigaction sa;
 * takes the number of bits for a chromosome and the number of chromosomes total
 *******************************************************************************/
 chromosomeList createChromosomeList(int chromoLength, int totalOrganisms){
+
+
+
   srand(time(NULL)); //seed random
   chromosomeList myChromosomeList;
   //allocate memory for each organism
@@ -107,9 +109,6 @@ static void findChromoOffsets(int index, indexOffset *returnVal){
   returnVal->B = B;
 }
 
-
-
-
 /*******************************************************************************
 * gets a specific bit set from a specified chromosome the index specifies the lowest
 * bit in the sequence EX. index 4 and numBits 5 would give a copy of bits 4-8
@@ -117,9 +116,10 @@ static void findChromoOffsets(int index, indexOffset *returnVal){
 * returns -1 if index is out of bounds
 *******************************************************************************/
 unsigned long* getBits(int index, chromosome *c, int numBits, unsigned long* returnVal){
-  sigaction(SIGSEGV, &sa, NULL); /*assign SIGSEGV to be handled by our sigHandler*/
+  struct sigaction oldAct;
+  sigaction(SIGSEGV, &sa, &oldAct); /*assign SIGSEGV to be handled by our sigHandler*/
   if(!setjmp(currentJump)){
-    indexOffset *inOff = malloc(sizeof(indexOffset*));
+    indexOffset *inOff = malloc(sizeof(indexOffset));
     findChromoOffsets(index, inOff);
     if(inOff == NULL) return NULL;
     unsigned long temp = c->bits[inOff->B_Index] >> inOff->B;
@@ -127,9 +127,10 @@ unsigned long* getBits(int index, chromosome *c, int numBits, unsigned long* ret
     *returnVal =  (temp & compare);//doesn't shift bits back to position
     return returnVal;
   }else{
+    sigaction(SIGSEGV, &oldAct, NULL); //restore old signal handler
     return NULL;
   }
-  signal(SIGSEGV, SIG_DFL);
+  sigaction(SIGSEGV, &oldAct, NULL); //restore old signal handler
 }
 
 
@@ -169,15 +170,17 @@ void mutate(chromosomeList *c, int numChromos){
 *******************************************************************************/
 static int flipBit(chromosome *c, int index){
   if(index < 0 || c == NULL) return -1;
-  sigaction(SIGSEGV, &sa, NULL); /*assign SIGSEGV to be handled by our sigHandler*/
+  struct sigaction oldAct;
+  sigaction(SIGSEGV, &sa, &oldAct); /*assign SIGSEGV to be handled by our sigHandler*/
   if(!setjmp(currentJump)){
     indexOffset *inOff = malloc(sizeof(indexOffset*));
     findChromoOffsets(index, inOff);
     c->bits[inOff->B_Index] = c->bits[inOff->B_Index] ^ (1 << inOff->B);
   }else{
+    sigaction(SIGSEGV, &oldAct, NULL); //restore old signal handler
     return -1;
   }
-  signal(SIGSEGV, SIG_DFL);
+  sigaction(SIGSEGV, &oldAct, NULL);
   return 1;
 }
 
